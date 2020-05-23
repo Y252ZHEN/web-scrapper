@@ -1,0 +1,139 @@
+from selenium import webdriver
+from time import sleep
+import xlsxwriter
+urls=[]
+content_list=[]
+class ElephantSpider:
+    def __init__(self):
+        self.start_url = "https://ke.qq.com/course/list?mt=1001"
+        self.driver = webdriver.Chrome('/Users/yulizheng/Downloads/chromedriver')
+
+    def get_content_list(self):
+        li_list = self.driver.find_elements_by_xpath("//ul[@class='course-card-list']/li")
+        
+        for li in li_list:
+            item = {}
+            #sleep(5) 
+            item['class_price'] = li.find_element_by_xpath("//span[@class='line-cell item-price  custom-string']").text
+            item['class_num'] = li.find_element_by_xpath("//span[@class='line-cell item-user custom-string']").text
+            href= li.find_element_by_class_name('item-img-link')
+            title=li.find_element_by_class_name('item-tt-link')
+            print(title.get_attribute("title"))
+            item['class_title'] = title.get_attribute("title")
+            content_list.append(item)
+            urls.append(href.get_attribute("href"))            
+
+        #获取下一页的元素
+        a_list = self.driver.find_elements_by_xpath("//div[@class='sort-page']/a")
+        element = a_list[-1].get_attribute("href")
+	
+        return element,content_list
+
+    def save_content_list(self,content_list):
+        pass
+
+    def run(self):#实现主要逻辑
+        #1、start_url
+        #2、发送请求，获取相应
+        self.driver.get(self.start_url)
+        sleep(5)
+        #3、提取数据，提取下一页按钮
+        element,content_list = self.get_content_list()
+        #保存数据
+        print('new page: ',element)
+        #self.save_content_list(urls)
+        #5、点下一页元素，循环
+        #while element != 'javascript:void(0);':
+        for i in range(1):
+            self.driver.get(element)
+            #sleep(5)
+            element,content_list = self.get_content_list()
+            #self.save_content_list(urls)
+            print('new page: ',element)
+            
+
+if __name__ == '__main__':
+    elephant = ElephantSpider()
+    elephant.run()
+    print(urls)
+    print(content_list)
+
+workbook = xlsxwriter.Workbook('TencentOutput.xlsx') 
+worksheet = workbook.add_worksheet()
+worksheet.write('A1', 'School')
+worksheet.write('B1', 'Title') 
+worksheet.write('C1', 'Type1')
+worksheet.write('D1', 'Type2') 
+worksheet.write('E1', 'Type3')  
+worksheet.write('F1', 'Number of Students')
+worksheet.write('G1', 'Price')
+worksheet.write('H1', 'Comment')
+worksheet.write('I1', 'URL')
+
+
+driver = webdriver.Chrome('/Users/yulizheng/Downloads/chromedriver')
+row = 1
+ 
+
+url = urls[:1]
+for counter,each in enumerate(url):
+    driver.get(each)    
+    comment_num_counter = 0 
+    sleep(1)
+    type_list =  driver.find_elements_by_xpath("//nav[@class='breadcrumb inner-center']/a")
+    type1=type_list[0].text
+    type2=type_list[1].text
+    type3=type_list[2].text
+    print(type1)
+    print(type2)
+    print(type3)
+    school_element = driver.find_elements_by_xpath("//div[@class='tt-cover-name']/a")
+    school = school_element[0].get_attribute("title")
+    print(school)
+    print(content_list[counter-1]['class_title'])
+    button_list = driver.find_elements_by_xpath("//div[@class='tabs-tt-bar js_tab js-tab-nav']/h2")
+    command_button = button_list[2]
+    print(button_list[2].text)
+    if '评论' in button_list[2].text and len(button_list[2].text) > 2 :
+        comment_num  = int(button_list[2].text.split('(',2)[1][:-1])
+        print(comment_num)
+        driver.execute_script("arguments[0].click();",command_button)
+        while comment_num_counter < comment_num:
+           sleep(5)
+           driver.execute_script("window.scrollTo(0, 1080)")
+           div_list = driver.find_elements_by_xpath(".//div[@class='comment-list grid-row-2']/div")     
+           for div in div_list:
+           
+               single_comment = div.find_element_by_xpath(".//div[@class='comment-bd']").text
+               print(single_comment)
+               worksheet.write('A'+ str(row+1),school)
+               worksheet.write('B'+ str(row+1),content_list[counter-1]['class_title'])
+               worksheet.write('C'+ str(row+1),type1)
+               worksheet.write('D'+ str(row+1),type2)
+               worksheet.write('E'+ str(row+1),type3)
+               worksheet.write('F'+ str(row+1),content_list[counter-1]['class_num'])
+               worksheet.write('G'+ str(row+1),content_list[counter-1]['class_price'])
+               worksheet.write('H'+ str(row+1),single_comment)
+               worksheet.write('I'+ str(row+1),each)        
+               comment_num_counter = comment_num_counter + 1 
+               row = row + 1 
+           print("comment_num_counter: ",comment_num_counter)
+           print("comment_num",comment_num)
+           sort_page = driver.find_element_by_class_name('page-next-btn')
+           print('still need to get loop through the index list of comment')
+           sort_page.click() 
+    else:
+         worksheet.write('A'+ str(row+1),school)
+         worksheet.write('B'+ str(row+1),content_list[counter-1]['class_title'])
+         worksheet.write('C'+ str(row+1),type1)
+         worksheet.write('D'+ str(row+1),type2)
+         worksheet.write('E'+ str(row+1),type3)
+         worksheet.write('F'+ str(row+1),content_list[counter-1]['class_num'])
+         worksheet.write('G'+ str(row+1),content_list[counter-1]['class_price'])
+         worksheet.write('H'+ str(row+1),'no_comment')
+         worksheet.write('I'+ str(row+1),each)
+         row = row + 1
+         print('no comment')      
+driver.quit()
+workbook.close()
+
